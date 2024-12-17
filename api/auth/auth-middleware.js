@@ -1,30 +1,34 @@
 const { JWT_SECRET } = require("../secrets"); // use this secret!
 const Users = require("../users/users-model");
-
+const jwt=require('jsonwebtoken')
 
 const restricted = (req, res, next) => {
-  console.log('Checking Restricted...')
-
-  /*
-    If the user does not provide a token in the Authorization header:
-    status 401
-    {
-      "message": "Token required"
+  const token=req.headers.authorization
+  if(!token){
+    return next({status:401, message:'Token Required'})
+  }
+  jwt.verify(token,JWT_SECRET,(err,decodedToken)=>{
+    if(err){
+      next({status:401,message:'Token Invalid'})
+    }else{
+      req.decodedToken=decodedToken
+      next()
     }
-
-    If the provided token does not verify:
-    status 401
-    {
-      "message": "Token invalid"
-    }
-
-    Put the decoded token in the req object, to make life easier for middlewares downstream!
-  */
-
+  })
 }
 
 const only = role_name => (req, res, next) => {
   console.log("Checking Only...")
+  const token=req.headers.authorization
+  jwt.verify(token,JWT_SECRET,(err,decodedToken)=>{
+    // console.log(decodedToken)
+    if(err){
+      next({status:403,message:'This is not for you'})
+    }else{
+      console.log(decodedToken)
+    }
+  })
+
   /*
     If the user does not provide a token in the Authorization header with a role_name
     inside its payload matching the role_name passed to this function as its argument:
@@ -52,14 +56,15 @@ const checkUsernameExists = async (req, res, next) => {
 
 
 const validateRoleName = (req, res, next) => {
-  const role_name = req.body.role_name.trim()
+  let role_name = req.body.role_name
+  if(role_name){role_name=role_name.trim()}
   if(!role_name){
     req.role_name = 'student'
     next()
-  }else if(role_name.trim()==='admin'){
+  }else if(role_name==='admin'){
     next({status: 422, message:'Role name can not be admin'})
-  }else if(role_name.trim().length>32){
-    next({status: 422, message:'Role name can not be longer than 32 characters'})
+  }else if(role_name.length>32){
+    next({status: 422, message:'Role name can not be longer than 32 chars'})
   } else {
     req.role_name = role_name
     next()
